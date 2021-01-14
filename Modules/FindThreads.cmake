@@ -10,6 +10,8 @@ This module determines the thread library of the system.
 Imported Targets
 ^^^^^^^^^^^^^^^^
 
+.. versionadded:: 3.1
+
 This module defines the following :prop_tgt:`IMPORTED` target:
 
 ``Threads::Threads``
@@ -37,6 +39,8 @@ Variables Affecting Behavior
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. variable:: THREADS_PREFER_PTHREAD_FLAG
+
+  .. versionadded:: 3.1
 
   If the use of the -pthread compiler and linker flag is preferred then
   the caller can set this variable to TRUE. The compiler flag can only be
@@ -66,7 +70,7 @@ endif()
 set(PTHREAD_C_CXX_TEST_SOURCE [====[
 #include <pthread.h>
 
-void* test_func(void* data)
+static void* test_func(void* data)
 {
   return data;
 }

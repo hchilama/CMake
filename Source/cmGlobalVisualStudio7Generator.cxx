@@ -380,10 +380,10 @@ void cmGlobalVisualStudio7Generator::WriteTargetsToSolution(
       std::string project = target->GetName();
       std::string location = *expath;
 
-      cmProp p = target->GetProperty("VS_PROJECT_TYPE");
-      this->WriteExternalProject(fout, project, location,
-                                 p ? p->c_str() : nullptr,
-                                 target->GetUtilities());
+      this->WriteExternalProject(
+        fout, project, location,
+        cmToCStr(target->GetProperty("VS_PROJECT_TYPE")),
+        target->GetUtilities());
       written = true;
     } else {
       cmProp vcprojName = target->GetProperty("GENERATOR_FILE_NAME");
@@ -626,9 +626,9 @@ std::string cmGlobalVisualStudio7Generator::WriteUtilityDepend(
 std::string cmGlobalVisualStudio7Generator::GetGUID(std::string const& name)
 {
   std::string const& guidStoreName = name + "_GUID_CMAKE";
-  if (const char* storedGUID =
+  if (cmProp storedGUID =
         this->CMakeInstance->GetCacheDefinition(guidStoreName)) {
-    return std::string(storedGUID);
+    return *storedGUID;
   }
   // Compute a GUID that is deterministic but unique to the build tree.
   std::string input =
@@ -676,11 +676,11 @@ std::set<std::string> cmGlobalVisualStudio7Generator::IsPartOfDefaultBuild(
           "CMAKE_VS_INCLUDE_" + t + "_TO_DEFAULT_BUILD";
         // inspect CMAKE_VS_INCLUDE_<t>_TO_DEFAULT_BUILD properties
         for (std::string const& i : configs) {
-          const char* propertyValue =
+          cmProp propertyValue =
             target->Target->GetMakefile()->GetDefinition(propertyName);
           if (propertyValue &&
               cmIsOn(cmGeneratorExpression::Evaluate(
-                propertyValue, target->GetLocalGenerator(), i))) {
+                *propertyValue, target->GetLocalGenerator(), i))) {
             activeConfigs.insert(i);
           }
         }

@@ -44,6 +44,16 @@ struct StandardNeeded
   int value;
 };
 
+int ParseStd(std::string const& level)
+{
+  try {
+    return std::stoi(level);
+  } catch (std::invalid_argument&) {
+    // Fall through to use an invalid value.
+  }
+  return -1;
+}
+
 struct StanardLevelComputer
 {
   explicit StanardLevelComputer(std::string lang, std::vector<int> levels,
@@ -63,7 +73,7 @@ struct StanardLevelComputer
     const auto& stds = this->Levels;
     const auto& stdsStrings = this->LevelsAsStrings;
 
-    const char* defaultStd = makefile->GetDefinition(
+    cmProp defaultStd = makefile->GetDefinition(
       cmStrCat("CMAKE_", this->Language, "_STANDARD_DEFAULT"));
     if (!cmNonempty(defaultStd)) {
       // this compiler has no notion of language standard levels
@@ -93,8 +103,7 @@ struct StanardLevelComputer
       std::string option_flag = cmStrCat(
         "CMAKE_", this->Language, *standardProp, "_", type, "_COMPILE_OPTION");
 
-      const char* opt =
-        target->Target->GetMakefile()->GetDefinition(option_flag);
+      cmProp opt = target->Target->GetMakefile()->GetDefinition(option_flag);
       if (!opt) {
         std::ostringstream e;
         e << "Target \"" << target->GetName()
@@ -114,17 +123,8 @@ struct StanardLevelComputer
       standardStr = "03";
     }
 
-    int standardValue = -1;
-    int defaultValue = -1;
-    try {
-      standardValue = std::stoi(standardStr);
-      defaultValue = std::stoi(defaultStd);
-    } catch (std::invalid_argument&) {
-      // fall through as we want an error
-      // when we can't find the bad value in the `stds` vector
-    }
-
-    auto stdIt = std::find(cm::cbegin(stds), cm::cend(stds), standardValue);
+    auto stdIt =
+      std::find(cm::cbegin(stds), cm::cend(stds), ParseStd(standardStr));
     if (stdIt == cm::cend(stds)) {
       std::string e =
         cmStrCat(this->Language, "_STANDARD is set to invalid value '",
@@ -135,11 +135,11 @@ struct StanardLevelComputer
     }
 
     auto defaultStdIt =
-      std::find(cm::cbegin(stds), cm::cend(stds), defaultValue);
+      std::find(cm::cbegin(stds), cm::cend(stds), ParseStd(*defaultStd));
     if (defaultStdIt == cm::cend(stds)) {
       std::string e = cmStrCat("CMAKE_", this->Language,
                                "_STANDARD_DEFAULT is set to invalid value '",
-                               defaultStd, "'");
+                               *defaultStd, "'");
       makefile->IssueMessage(MessageType::INTERNAL_ERROR, e);
       return std::string{};
     }
@@ -185,7 +185,7 @@ struct StanardLevelComputer
 
     cmProp existingStandard = currentLangStandardValue;
     if (existingStandard == nullptr) {
-      cmProp defaultStandard = makefile->GetDef(
+      cmProp defaultStandard = makefile->GetDefinition(
         cmStrCat("CMAKE_", this->Language, "_STANDARD_DEFAULT"));
       if (cmNonempty(defaultStandard)) {
         existingStandard = defaultStandard;
@@ -196,7 +196,7 @@ struct StanardLevelComputer
     if (existingStandard) {
       existingLevelIter =
         std::find(cm::cbegin(this->Levels), cm::cend(this->Levels),
-                  std::stoi(*existingStandard));
+                  ParseStd(*existingStandard));
       if (existingLevelIter == cm::cend(this->Levels)) {
         const std::string e =
           cmStrCat("The ", this->Language, "_STANDARD property on target \"",
@@ -228,7 +228,7 @@ struct StanardLevelComputer
                              std::string const& config,
                              std::string const& feature) const
   {
-    cmProp defaultStandard = makefile->GetDef(
+    cmProp defaultStandard = makefile->GetDefinition(
       cmStrCat("CMAKE_", this->Language, "_STANDARD_DEFAULT"));
     if (!defaultStandard) {
       makefile->IssueMessage(
@@ -241,7 +241,7 @@ struct StanardLevelComputer
     }
     // convert defaultStandard to an integer
     if (std::find(cm::cbegin(this->Levels), cm::cend(this->Levels),
-                  std::stoi(*defaultStandard)) == cm::cend(this->Levels)) {
+                  ParseStd(*defaultStandard)) == cm::cend(this->Levels)) {
       const std::string e = cmStrCat("The CMAKE_", this->Language,
                                      "_STANDARD_DEFAULT variable contains an "
                                      "invalid value: \"",
@@ -258,7 +258,7 @@ struct StanardLevelComputer
 
     auto existingLevelIter =
       std::find(cm::cbegin(this->Levels), cm::cend(this->Levels),
-                std::stoi(*existingStandard));
+                ParseStd(*existingStandard));
     if (existingLevelIter == cm::cend(this->Levels)) {
       const std::string e =
         cmStrCat("The ", this->Language, "_STANDARD property on target \"",
@@ -280,9 +280,9 @@ struct StanardLevelComputer
     std::string prefix = cmStrCat("CMAKE_", this->Language);
     StandardNeeded maxLevel = { -1, -1 };
     for (size_t i = 0; i < this->Levels.size(); ++i) {
-      if (const char* prop = makefile->GetDefinition(
+      if (cmProp prop = makefile->GetDefinition(
             cmStrCat(prefix, this->LevelsAsStrings[i], "_COMPILE_FEATURES"))) {
-        std::vector<std::string> props = cmExpandedList(prop);
+        std::vector<std::string> props = cmExpandedList(*prop);
         if (cm::contains(props, feature)) {
           maxLevel = { static_cast<int>(i), this->Levels[i] };
         }
@@ -312,19 +312,19 @@ std::unordered_map<std::string, StanardLevelComputer> StandardComputerMapping =
                             std::vector<std::string>{ "90", "99", "11" } } },
     { "CXX",
       StanardLevelComputer{
-        "CXX", std::vector<int>{ 98, 11, 14, 17, 20 },
-        std::vector<std::string>{ "98", "11", "14", "17", "20" } } },
+        "CXX", std::vector<int>{ 98, 11, 14, 17, 20, 23 },
+        std::vector<std::string>{ "98", "11", "14", "17", "20", "23" } } },
     { "CUDA",
       StanardLevelComputer{
-        "CUDA", std::vector<int>{ 03, 11, 14, 17, 20 },
-        std::vector<std::string>{ "03", "11", "14", "17", "20" } } },
+        "CUDA", std::vector<int>{ 03, 11, 14, 17, 20, 23 },
+        std::vector<std::string>{ "03", "11", "14", "17", "20", "23" } } },
     { "OBJC",
       StanardLevelComputer{ "OBJC", std::vector<int>{ 90, 99, 11 },
                             std::vector<std::string>{ "90", "99", "11" } } },
     { "OBJCXX",
       StanardLevelComputer{
-        "OBJCXX", std::vector<int>{ 98, 11, 14, 17, 20 },
-        std::vector<std::string>{ "98", "11", "14", "17", "20" } } },
+        "OBJCXX", std::vector<int>{ 98, 11, 14, 17, 20, 23 },
+        std::vector<std::string>{ "98", "11", "14", "17", "20", "23" } } },
   };
 }
 
@@ -390,9 +390,10 @@ bool cmStandardLevelResolver::CheckCompileFeaturesAvailable(
     std::ostringstream e;
     e << "The compiler feature \"" << feature << "\" is not known to " << lang
       << " compiler\n\""
-      << this->Makefile->GetDefinition("CMAKE_" + lang + "_COMPILER_ID")
+      << this->Makefile->GetSafeDefinition("CMAKE_" + lang + "_COMPILER_ID")
       << "\"\nversion "
-      << this->Makefile->GetDefinition("CMAKE_" + lang + "_COMPILER_VERSION")
+      << this->Makefile->GetSafeDefinition("CMAKE_" + lang +
+                                           "_COMPILER_VERSION")
       << ".";
     if (error) {
       *error = e.str();
@@ -469,7 +470,7 @@ const char* cmStandardLevelResolver::CompileFeaturesAvailable(
     return nullptr;
   }
 
-  const char* featuresKnown =
+  cmProp featuresKnown =
     this->Makefile->GetDefinition("CMAKE_" + lang + "_COMPILE_FEATURES");
 
   if (!cmNonempty(featuresKnown)) {
@@ -492,7 +493,7 @@ const char* cmStandardLevelResolver::CompileFeaturesAvailable(
     }
     return nullptr;
   }
-  return featuresKnown;
+  return cmToCStr(featuresKnown);
 }
 
 bool cmStandardLevelResolver::GetNewRequiredStandard(

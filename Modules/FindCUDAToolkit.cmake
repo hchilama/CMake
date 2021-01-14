@@ -11,6 +11,9 @@ This script locates the NVIDIA CUDA toolkit and the associated libraries, but
 does not require the ``CUDA`` language be enabled for a given project. This
 module does not search for the NVIDIA CUDA Samples.
 
+.. versionadded:: 3.19
+  QNX support.
+
 Search Behavior
 ^^^^^^^^^^^^^^^
 
@@ -426,6 +429,8 @@ Result variables
     Runtime library ``cudart``.
 
 ``CUDAToolkit_LIBRARY_ROOT``
+    .. versionadded:: 3.18
+
     The path to the CUDA Toolkit directory containing the nvvm directory and
     version.txt.
 
@@ -514,7 +519,19 @@ else()
       endif()
 
       if(CUDAToolkit_NVCC_EXECUTABLE)
-        get_filename_component(CUDAToolkit_BIN_DIR "${CUDAToolkit_NVCC_EXECUTABLE}" DIRECTORY)
+        # If NVCC is a symlink due to a wrapper script (e.g. ccache or colornvcc), then invoke it to find the
+        # real non-scattered toolkit.
+        if(IS_SYMLINK ${CUDAToolkit_NVCC_EXECUTABLE})
+          execute_process(COMMAND ${CUDAToolkit_NVCC_EXECUTABLE} "-v" "__cmake_determine_cuda" ERROR_VARIABLE NVCC_ERR)
+          if(NVCC_ERR MATCHES " _HERE_=([^\r\n]*)")
+            set(CUDAToolkit_BIN_DIR "${CMAKE_MATCH_1}")
+          else()
+            message(FATAL_ERROR "Could not execute nvcc with -v.")
+          endif()
+          unset(NVCC_ERR)
+        else()
+          get_filename_component(CUDAToolkit_BIN_DIR "${CUDAToolkit_NVCC_EXECUTABLE}" DIRECTORY)
+        endif()
 
         set(CUDAToolkit_BIN_DIR "${CUDAToolkit_BIN_DIR}" CACHE PATH "" FORCE)
         mark_as_advanced(CUDAToolkit_BIN_DIR)
@@ -668,18 +685,18 @@ else()
   unset(_CUDAToolkit_version_file)
 endif()
 
-# Handle cross compilation
+# Find target directory when crosscompiling.
 if(CMAKE_CROSSCOMPILING)
   if(CMAKE_SYSTEM_PROCESSOR STREQUAL "armv7-a")
     # Support for NVPACK
     set(CUDAToolkit_TARGET_NAME "armv7-linux-androideabi")
   elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm")
-    # Support for arm cross compilation
     set(CUDAToolkit_TARGET_NAME "armv7-linux-gnueabihf")
   elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
-    # Support for aarch64 cross compilation
     if(ANDROID_ARCH_NAME STREQUAL "arm64")
       set(CUDAToolkit_TARGET_NAME "aarch64-linux-androideabi")
+    elseif (CMAKE_SYSTEM_NAME STREQUAL "QNX")
+      set(CUDAToolkit_TARGET_NAME "aarch64-qnx")
     else()
       set(CUDAToolkit_TARGET_NAME "aarch64-linux")
     endif(ANDROID_ARCH_NAME STREQUAL "arm64")
@@ -698,7 +715,10 @@ if(CMAKE_CROSSCOMPILING)
     # PATh
     set(_CUDAToolkit_Pop_ROOT_PATH True)
   endif()
-else()
+endif()
+
+# If not already set we can simply use the toolkit root or it's a scattered installation.
+if(NOT CUDAToolkit_TARGET_DIR)
   # Not cross compiling
   set(CUDAToolkit_TARGET_DIR "${CUDAToolkit_ROOT_DIR}")
   # Now that we have the real ROOT_DIR, find components inside it.
@@ -859,7 +879,7 @@ if(CUDAToolkit_FOUND)
       target_link_libraries(CUDA::cudart_static_deps INTERFACE Threads::Threads ${CMAKE_DL_LIBS})
     endif()
 
-    if(UNIX AND NOT APPLE)
+    if(UNIX AND NOT APPLE AND NOT (CMAKE_SYSTEM_NAME STREQUAL "QNX"))
       # On Linux, you must link against librt when using the static cuda runtime.
       find_library(CUDAToolkit_rt_LIBRARY rt)
       mark_as_advanced(CUDAToolkit_rt_LIBRARY)

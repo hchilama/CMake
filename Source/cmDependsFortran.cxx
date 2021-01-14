@@ -12,9 +12,11 @@
 
 #include "cmFortranParser.h" /* Interface to parser object.  */
 #include "cmGeneratedFileStream.h"
+#include "cmGlobalUnixMakefileGenerator3.h"
 #include "cmLocalUnixMakefileGenerator3.h"
 #include "cmMakefile.h"
 #include "cmOutputConverter.h"
+#include "cmProperty.h"
 #include "cmStateDirectory.h"
 #include "cmStateSnapshot.h"
 #include "cmStringAlgorithms.h"
@@ -319,14 +321,28 @@ bool cmDependsFortran::WriteDependenciesReal(std::string const& obj,
   std::string obj_i = this->MaybeConvertToRelativePath(binDir, obj);
   std::string obj_m = cmSystemTools::ConvertToOutputPath(obj_i);
   internalDepends << obj_i << "\n " << src << '\n';
-  for (std::string const& i : info.Includes) {
-    makeDepends << obj_m << ": "
-                << cmSystemTools::ConvertToOutputPath(
-                     this->MaybeConvertToRelativePath(binDir, i))
-                << '\n';
-    internalDepends << ' ' << i << '\n';
+  if (!info.Includes.empty()) {
+    const auto& lineContinue = static_cast<cmGlobalUnixMakefileGenerator3*>(
+                                 this->LocalGenerator->GetGlobalGenerator())
+                                 ->LineContinueDirective;
+    bool supportLongLineDepend = static_cast<cmGlobalUnixMakefileGenerator3*>(
+                                   this->LocalGenerator->GetGlobalGenerator())
+                                   ->SupportsLongLineDependencies();
+    if (supportLongLineDepend) {
+      makeDepends << obj_m << ':';
+    }
+    for (std::string const& i : info.Includes) {
+      std::string dependee = cmSystemTools::ConvertToOutputPath(
+        this->MaybeConvertToRelativePath(binDir, i));
+      if (supportLongLineDepend) {
+        makeDepends << ' ' << lineContinue << ' ' << dependee;
+      } else {
+        makeDepends << obj_m << ": " << dependee << '\n';
+      }
+      internalDepends << ' ' << i << '\n';
+    }
+    makeDepends << '\n';
   }
-  makeDepends << '\n';
 
   // Write module requirements to the output stream.
   for (std::string const& i : info.Requires) {
@@ -394,9 +410,9 @@ bool cmDependsFortran::WriteDependenciesReal(std::string const& obj,
       makeDepends << "\t$(CMAKE_COMMAND) -E cmake_copy_f90_mod " << modFile
                   << ' ' << stampFileForShell;
       cmMakefile* mf = this->LocalGenerator->GetMakefile();
-      const char* cid = mf->GetDefinition("CMAKE_Fortran_COMPILER_ID");
+      cmProp cid = mf->GetDefinition("CMAKE_Fortran_COMPILER_ID");
       if (cmNonempty(cid)) {
-        makeDepends << ' ' << cid;
+        makeDepends << ' ' << *cid;
       }
       makeDepends << '\n';
     }

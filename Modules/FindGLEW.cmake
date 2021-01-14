@@ -21,6 +21,8 @@ The following variables may be set to influence this module's behavior:
 Imported Targets
 ^^^^^^^^^^^^^^^^
 
+.. versionadded:: 3.1
+
 This module defines the following :ref:`Imported Targets <Imported Targets>`:
 
 
@@ -54,6 +56,9 @@ This module defines the following variables:
   GLEW minor version
 ``GLEW_VERSION_MICRO``
   GLEW micro version
+
+.. versionadded:: 3.7
+  Debug and Release variants are found separately.
 
 #]=======================================================================]
 
@@ -126,12 +131,11 @@ if(GLEW_VERBOSE)
   message(STATUS "FindGLEW: GLEW_INCLUDE_DIRS: ${GLEW_INCLUDE_DIRS}")
 endif()
 
-if("${CMAKE_GENERATOR_PLATFORM}" MATCHES "x64" OR "${CMAKE_GENERATOR}" MATCHES "Win64")
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
   set(_arch "x64")
 else()
   set(_arch "Win32")
 endif()
-
 
 set(__GLEW_CURRENT_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
 

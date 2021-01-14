@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmGlobalXCodeGenerator_h
-#define cmGlobalXCodeGenerator_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -12,10 +11,13 @@
 #include <string>
 #include <vector>
 
+#include <cm/string_view>
+
 #include "cmGlobalGenerator.h"
 #include "cmXCodeObject.h"
 
 class cmCustomCommand;
+class cmCustomCommandGenerator;
 class cmGeneratorTarget;
 class cmGlobalGeneratorFactory;
 class cmLocalGenerator;
@@ -114,13 +116,26 @@ public:
                            cmMakefile* mf) override;
   void AppendFlag(std::string& flags, std::string const& flag) const;
 
+  enum class BuildSystem
+  {
+    One = 1,
+    Twelve = 12,
+  };
+
 protected:
   void AddExtraIDETargets() override;
-  void ComputeTargetOrder();
-  void ComputeTargetOrder(cmGeneratorTarget const* gt, size_t& index);
   void Generate() override;
 
+  FindMakeProgramStage GetFindMakeProgramStage() const override
+  {
+    return FindMakeProgramStage::Early;
+  }
+
 private:
+  bool ParseGeneratorToolset(std::string const& ts, cmMakefile* mf);
+  bool ProcessGeneratorToolsetField(std::string const& key,
+                                    std::string const& value, cmMakefile* mf);
+
   cmXCodeObject* CreateOrGetPBXGroup(cmGeneratorTarget* gtgt,
                                      cmSourceGroup* sg);
   cmXCodeObject* CreatePBXGroup(cmXCodeObject* parent,
@@ -149,11 +164,13 @@ private:
                                  const std::string& configName);
 
   cmXCodeObject* FindXCodeTarget(const cmGeneratorTarget*);
+  std::string GetObjectId(cmXCodeObject::PBXType ptype, cm::string_view key);
   std::string GetOrCreateId(const std::string& name, const std::string& id);
 
   // create cmXCodeObject from these functions so that memory can be managed
   // correctly.  All objects created are stored in this->XCodeObjects.
-  cmXCodeObject* CreateObject(cmXCodeObject::PBXType ptype);
+  cmXCodeObject* CreateObject(cmXCodeObject::PBXType ptype,
+                              cm::string_view key = {});
   cmXCodeObject* CreateObject(cmXCodeObject::Type type);
   cmXCodeObject* CreateString(const std::string& s);
   cmXCodeObject* CreateObjectReference(cmXCodeObject*);
@@ -168,12 +185,18 @@ private:
   std::string AddConfigurations(cmXCodeObject* target,
                                 cmGeneratorTarget* gtgt);
   void AppendOrAddBuildSetting(cmXCodeObject* settings, const char* attr,
-                               const char* value);
+                               cmXCodeObject* value);
+  void AppendBuildSettingAttribute(cmXCodeObject* settings,
+                                   const char* attribute, cmXCodeObject* attr,
+                                   cmXCodeObject* value);
   void AppendBuildSettingAttribute(cmXCodeObject* target, const char* attr,
-                                   const char* value,
+                                   cmXCodeObject* value,
                                    const std::string& configName);
+  void InheritBuildSettingAttribute(cmXCodeObject* target,
+                                    const char* attribute);
   cmXCodeObject* CreateUtilityTarget(cmGeneratorTarget* gtgt);
   void AddDependAndLinkInformation(cmXCodeObject* target);
+  void AddEmbeddedFrameworks(cmXCodeObject* target);
   void AddPositionIndependentLinkAttribute(cmGeneratorTarget* target,
                                            cmXCodeObject* buildSettings,
                                            const std::string& configName);
@@ -219,14 +242,27 @@ private:
                          std::vector<cmXCodeObject*>&);
   bool IsHeaderFile(cmSourceFile*);
   void AddDependTarget(cmXCodeObject* target, cmXCodeObject* dependTarget);
-  void CreateXCodeDependHackTarget(std::vector<cmXCodeObject*>& targets);
+  void CreateXCodeDependHackMakefile(std::vector<cmXCodeObject*>& targets);
   bool SpecialTargetEmitted(std::string const& tname);
   void SetGenerationRoot(cmLocalGenerator* root);
   void AddExtraTargets(cmLocalGenerator* root,
                        std::vector<cmLocalGenerator*>& gens);
-  cmXCodeObject* CreateBuildPhase(const char* name, const char* name2,
-                                  cmGeneratorTarget* target,
-                                  const std::vector<cmCustomCommand>&);
+  cmXCodeObject* CreateLegacyRunScriptBuildPhase(
+    const char* name, const char* name2, cmGeneratorTarget* target,
+    const std::vector<cmCustomCommand>&);
+  void CreateRunScriptBuildPhases(cmXCodeObject* buildPhases,
+                                  cmGeneratorTarget const* gt);
+  void CreateRunScriptBuildPhases(cmXCodeObject* buildPhases,
+                                  cmSourceFile const* sf,
+                                  cmGeneratorTarget const* gt,
+                                  std::set<cmSourceFile const*>& visited);
+  cmXCodeObject* CreateRunScriptBuildPhase(cmSourceFile const* sf,
+                                           cmGeneratorTarget const* gt,
+                                           cmCustomCommand const& cc);
+  cmXCodeObject* CreateRunScriptBuildPhase(
+    std::string const& name, cmGeneratorTarget const* gt,
+    std::vector<cmCustomCommand> const& commands);
+  std::string ConstructScript(cmCustomCommandGenerator const& ccg);
   void CreateReRunCMakeFile(cmLocalGenerator* root,
                             std::vector<cmLocalGenerator*> const& gens);
 
@@ -256,6 +292,8 @@ protected:
   std::set<std::string> XCodeObjectIDs;
   std::vector<std::unique_ptr<cmXCodeObject>> XCodeObjects;
   cmXCodeObject* RootObject;
+
+  BuildSystem XcodeBuildSystem = BuildSystem::One;
 
 private:
   std::string const& GetXcodeBuildCommand();
@@ -297,15 +335,18 @@ private:
   std::map<std::string, cmXCodeObject*> TargetGroup;
   std::map<std::string, cmXCodeObject*> FileRefs;
   std::map<std::string, cmXCodeObject*> ExternalLibRefs;
+  std::map<std::string, cmXCodeObject*> EmbeddedLibRefs;
   std::map<cmGeneratorTarget const*, cmXCodeObject*> XCodeObjectMap;
   std::map<cmXCodeObject*, cmXCodeObject*> FileRefToBuildFileMap;
+  std::map<cmXCodeObject*, cmXCodeObject*> FileRefToEmbedBuildFileMap;
   std::vector<std::string> Architectures;
   std::string ObjectDirArchDefault;
   std::string ObjectDirArch;
   std::string SystemName;
   std::string GeneratorToolset;
-  std::map<cmGeneratorTarget const*, size_t> TargetOrderIndex;
   std::vector<std::string> EnabledLangs;
+  std::map<cmGeneratorTarget const*, std::set<cmSourceFile const*>>
+    CommandsVisited;
+  std::map<cmSourceFile const*, std::set<cmGeneratorTarget const*>>
+    CustomCommandRoots;
 };
-
-#endif

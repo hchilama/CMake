@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmGeneratorTarget_h
-#define cmGeneratorTarget_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -418,6 +417,8 @@ public:
   // until we have per-target object file properties.
   void GetLanguages(std::set<std::string>& languages,
                     std::string const& config) const;
+  bool IsLanguageUsed(std::string const& language,
+                      std::string const& config) const;
 
   bool IsCSharpOnly() const;
 
@@ -429,8 +430,9 @@ public:
 
   /** Get source files common to all configurations and diagnose cases
       with per-config sources.  Excludes sources added by a TARGET_OBJECTS
-      generator expression.  */
-  bool GetConfigCommonSourceFiles(std::vector<cmSourceFile*>& files) const;
+      generator expression.  Do not use outside the Xcode generator.  */
+  bool GetConfigCommonSourceFilesForXcode(
+    std::vector<cmSourceFile*>& files) const;
 
   bool HaveBuildTreeRPATH(const std::string& config) const;
 
@@ -446,8 +448,13 @@ public:
   void GetAppleArchs(const std::string& config,
                      std::vector<std::string>& archVec) const;
 
+  void AddExplicitLanguageFlags(std::string& flags,
+                                cmSourceFile const& sf) const;
+
   void AddCUDAArchitectureFlags(std::string& flags) const;
   void AddCUDAToolkitFlags(std::string& flags) const;
+
+  void AddISPCTargetFlags(std::string& flags) const;
 
   std::string GetFeatureSpecificLinkRuleVariable(
     std::string const& var, std::string const& lang,
@@ -578,7 +585,8 @@ public:
     std::string PdbDir;
     bool empty() const
     {
-      return OutDir.empty() && ImpDir.empty() && PdbDir.empty();
+      return this->OutDir.empty() && this->ImpDir.empty() &&
+        this->PdbDir.empty();
     }
   };
 
@@ -712,6 +720,10 @@ public:
   bool GetImplibGNUtoMS(std::string const& config, std::string const& gnuName,
                         std::string& out, const char* newExt = nullptr) const;
 
+  /** Can only ever return true if GetSourceFilePaths() was called before.
+      Otherwise, this is indeterminate and false will be assumed/returned!  */
+  bool HasContextDependentSources() const;
+
   bool IsExecutableWithExports() const;
 
   /** Return whether or not the target has a DLL import library.  */
@@ -816,6 +828,16 @@ public:
 
   const std::string& GetSourcesProperty() const;
 
+  void AddISPCGeneratedHeader(std::string const& header,
+                              std::string const& config);
+  std::vector<std::string> GetGeneratedISPCHeaders(
+    std::string const& config) const;
+
+  void AddISPCGeneratedObject(std::vector<std::string>&& objs,
+                              std::string const& config);
+  std::vector<std::string> GetGeneratedISPCObjects(
+    std::string const& config) const;
+
 private:
   void AddSourceCommon(const std::string& src, bool before = false);
 
@@ -834,6 +856,8 @@ private:
   mutable std::set<std::string> VisitedConfigsForObjects;
   mutable std::map<cmSourceFile const*, std::string> Objects;
   std::set<cmSourceFile const*> ExplicitObjectName;
+
+  // "config/language" is the key
   mutable std::map<std::string, std::vector<std::string>> SystemIncludesCache;
 
   mutable std::string ExportMacro;
@@ -846,12 +870,12 @@ private:
 
   bool NeedImportLibraryName(std::string const& config) const;
 
-  const char* GetFilePrefixInternal(std::string const& config,
-                                    cmStateEnums::ArtifactType artifact,
-                                    const std::string& language = "") const;
-  const char* GetFileSuffixInternal(std::string const& config,
-                                    cmStateEnums::ArtifactType artifact,
-                                    const std::string& language = "") const;
+  cmProp GetFilePrefixInternal(std::string const& config,
+                               cmStateEnums::ArtifactType artifact,
+                               const std::string& language = "") const;
+  cmProp GetFileSuffixInternal(std::string const& config,
+                               cmStateEnums::ArtifactType artifact,
+                               const std::string& language = "") const;
 
   std::string GetFullNameInternal(const std::string& config,
                                   cmStateEnums::ArtifactType artifact) const;
@@ -994,6 +1018,11 @@ private:
 
   std::unordered_set<std::string> UnityBatchedSourceFiles;
 
+  std::unordered_map<std::string, std::vector<std::string>>
+    ISPCGeneratedHeaders;
+  std::unordered_map<std::string, std::vector<std::string>>
+    ISPCGeneratedObjects;
+
   bool IsLinkLookupScope(std::string const& n,
                          cmLocalGenerator const*& lg) const;
 
@@ -1053,8 +1082,14 @@ private:
   mutable bool DebugLinkDirectoriesDone;
   mutable bool DebugPrecompileHeadersDone;
   mutable bool DebugSourcesDone;
-  mutable bool LinkImplementationLanguageIsContextDependent;
   mutable bool UtilityItemsDone;
+  enum class Tribool
+  {
+    False = 0x0,
+    True = 0x1,
+    Indeterminate = 0x2
+  };
+  mutable Tribool SourcesAreContextDependent;
 
   bool ComputePDBOutputDir(const std::string& kind, const std::string& config,
                            std::string& out) const;
@@ -1085,5 +1120,3 @@ public:
                     cmGeneratorTarget const* t2) const;
   };
 };
-
-#endif

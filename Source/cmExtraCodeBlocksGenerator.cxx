@@ -16,6 +16,7 @@
 #include "cmGlobalGenerator.h"
 #include "cmLocalGenerator.h"
 #include "cmMakefile.h"
+#include "cmProperty.h"
 #include "cmRange.h"
 #include "cmSourceFile.h"
 #include "cmStateTypes.h"
@@ -111,10 +112,10 @@ void Tree::InsertPath(const std::vector<std::string>& split,
                       const std::string& fileName)
 {
   if (start == split.size()) {
-    files.insert(fileName);
+    this->files.insert(fileName);
     return;
   }
-  for (Tree& folder : folders) {
+  for (Tree& folder : this->folders) {
     if (folder.path == split[start]) {
       if (start + 1 < split.size()) {
         folder.InsertPath(split, start + 1, fileName);
@@ -130,19 +131,19 @@ void Tree::InsertPath(const std::vector<std::string>& split,
   newFolder.path = split[start];
   if (start + 1 < split.size()) {
     newFolder.InsertPath(split, start + 1, fileName);
-    folders.push_back(newFolder);
+    this->folders.push_back(newFolder);
     return;
   }
   // last part of split
   newFolder.files.insert(fileName);
-  folders.push_back(newFolder);
+  this->folders.push_back(newFolder);
 }
 
 void Tree::BuildVirtualFolder(cmXMLWriter& xml) const
 {
   xml.StartElement("Option");
   std::string virtualFolders = "CMake Files\\;";
-  for (Tree const& folder : folders) {
+  for (Tree const& folder : this->folders) {
     folder.BuildVirtualFolderImpl(virtualFolders, "");
   }
   xml.Attribute("virtualFolders", virtualFolders);
@@ -152,15 +153,15 @@ void Tree::BuildVirtualFolder(cmXMLWriter& xml) const
 void Tree::BuildVirtualFolderImpl(std::string& virtualFolders,
                                   const std::string& prefix) const
 {
-  virtualFolders += "CMake Files\\" + prefix + path + "\\;";
-  for (Tree const& folder : folders) {
-    folder.BuildVirtualFolderImpl(virtualFolders, prefix + path + "\\");
+  virtualFolders += "CMake Files\\" + prefix + this->path + "\\;";
+  for (Tree const& folder : this->folders) {
+    folder.BuildVirtualFolderImpl(virtualFolders, prefix + this->path + "\\");
   }
 }
 
 void Tree::BuildUnit(cmXMLWriter& xml, const std::string& fsPath) const
 {
-  for (std::string const& f : files) {
+  for (std::string const& f : this->files) {
     xml.StartElement("Unit");
     xml.Attribute("filename", fsPath + f);
 
@@ -170,7 +171,7 @@ void Tree::BuildUnit(cmXMLWriter& xml, const std::string& fsPath) const
 
     xml.EndElement();
   }
-  for (Tree const& folder : folders) {
+  for (Tree const& folder : this->folders) {
     folder.BuildUnitImpl(xml, "", fsPath);
   }
 }
@@ -179,20 +180,21 @@ void Tree::BuildUnitImpl(cmXMLWriter& xml,
                          const std::string& virtualFolderPath,
                          const std::string& fsPath) const
 {
-  for (std::string const& f : files) {
+  for (std::string const& f : this->files) {
     xml.StartElement("Unit");
-    xml.Attribute("filename", cmStrCat(fsPath, path, "/", f));
+    xml.Attribute("filename", cmStrCat(fsPath, this->path, "/", f));
 
     xml.StartElement("Option");
-    xml.Attribute("virtualFolder",
-                  cmStrCat("CMake Files\\", virtualFolderPath, path, "\\"));
+    xml.Attribute(
+      "virtualFolder",
+      cmStrCat("CMake Files\\", virtualFolderPath, this->path, "\\"));
     xml.EndElement();
 
     xml.EndElement();
   }
-  for (Tree const& folder : folders) {
-    folder.BuildUnitImpl(xml, cmStrCat(virtualFolderPath, path, "\\"),
-                         cmStrCat(fsPath, path, "/"));
+  for (Tree const& folder : this->folders) {
+    folder.BuildUnitImpl(xml, cmStrCat(virtualFolderPath, this->path, "\\"),
+                         cmStrCat(fsPath, this->path, "/"));
   }
 }
 
@@ -496,15 +498,15 @@ void cmExtraCodeBlocksGenerator::AppendTarget(
     if (target->GetType() == cmStateEnums::EXECUTABLE) {
       // Determine the directory where the executable target is created, and
       // set the working directory to this dir.
-      const char* runtimeOutputDir =
+      cmProp runtimeOutputDir =
         makefile->GetDefinition("CMAKE_RUNTIME_OUTPUT_DIRECTORY");
-      if (runtimeOutputDir != nullptr) {
-        workingDir = runtimeOutputDir;
+      if (runtimeOutputDir) {
+        workingDir = *runtimeOutputDir;
       } else {
-        const char* executableOutputDir =
+        cmProp executableOutputDir =
           makefile->GetDefinition("EXECUTABLE_OUTPUT_PATH");
-        if (executableOutputDir != nullptr) {
-          workingDir = executableOutputDir;
+        if (executableOutputDir) {
+          workingDir = *executableOutputDir;
         }
       }
     }

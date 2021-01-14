@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmStringAlgorithms_h
-#define cmStringAlgorithms_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -34,6 +33,13 @@ inline bool cmNonempty(std::string const* str)
   return str && !str->empty();
 }
 
+/** Returns length of a literal string.  */
+template <size_t N>
+constexpr size_t cmStrLen(const char (&/*str*/)[N])
+{
+  return N - 1;
+}
+
 /** Callable string comparison struct.  */
 struct cmStrCmp
 {
@@ -42,7 +48,7 @@ struct cmStrCmp
   {
   }
 
-  bool operator()(cm::string_view sv) const { return Test_ == sv; }
+  bool operator()(cm::string_view sv) const { return this->Test_ == sv; }
 
 private:
   std::string const Test_;
@@ -80,6 +86,17 @@ std::string cmJoin(Range const& rng, cm::string_view separator)
   }
   return os.str();
 }
+
+/**
+ * Faster overloads for std::string ranges.
+ * If @a initial is provided, it prepends the resulted string without
+ * @a separator between them.
+ */
+std::string cmJoin(std::vector<std::string> const& rng,
+                   cm::string_view separator, cm::string_view initial = {});
+
+std::string cmJoin(cmStringRange const& rng, cm::string_view separator,
+                   cm::string_view initial = {});
 
 /** Extract tokens that are separated by any of the characters in @a sep.  */
 std::vector<std::string> cmTokenize(cm::string_view str, cm::string_view sep);
@@ -146,9 +163,9 @@ public:
   {
   }
   cmAlphaNum(char ch)
-    : View_(Digits_, 1)
+    : View_(this->Digits_, 1)
   {
-    Digits_[0] = ch;
+    this->Digits_[0] = ch;
   }
   cmAlphaNum(int val);
   cmAlphaNum(unsigned int val);
@@ -159,7 +176,7 @@ public:
   cmAlphaNum(float val);
   cmAlphaNum(double val);
 
-  cm::string_view View() const { return View_; }
+  cm::string_view View() const { return this->View_; }
 
 private:
   cm::string_view View_;
@@ -306,5 +323,3 @@ bool cmStrToLong(std::string const& str, long* value);
  * integer */
 bool cmStrToULong(const char* str, unsigned long* value);
 bool cmStrToULong(std::string const& str, unsigned long* value);
-
-#endif

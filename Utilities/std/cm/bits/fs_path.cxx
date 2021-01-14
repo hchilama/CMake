@@ -181,9 +181,10 @@ public:
         if (posSep == rend) {
           this->set_state(state::in_root_dir);
         } else {
-          auto pos = this->consume_root_name(posSep, rend, true);
+          auto pos = this->consume_root_name(posSep ? posSep : rstart, rend,
+                                             posSep != nullptr);
           if (pos == rend) {
-            this->set_state(state::in_root_dir);
+            this->set_state(posSep ? state::in_root_dir : state::in_root_name);
           } else {
             this->consume_filename(posSep, rend);
             this->set_state(state::in_filename);
@@ -847,7 +848,7 @@ cm::string_view path::get_filename_fragment(filename_fragment fragment) const
 {
   auto file = this->get_filename();
 
-  if (file == "." || file == ".." || file.empty()) {
+  if (file.empty() || file == "." || file == "..") {
     return fragment == filename_fragment::stem ? file : cm::string_view{};
   }
 

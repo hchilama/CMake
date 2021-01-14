@@ -77,6 +77,9 @@ operation and would not normally be the way the module is used, but it is
 sometimes useful as part of implementing some higher level feature or to
 populate some content in CMake's script mode.
 
+.. versionchanged:: 3.14
+  ``FetchContent`` commands can access the terminal. This is necessary
+  for password prompts and real-time progress displays to work.
 
 Commands
 ^^^^^^^^
@@ -371,6 +374,8 @@ is simpler and provides additional features over the pattern above.
   :variable:`CMAKE_MAKE_PROGRAM` variables will need to be set appropriately
   on the command line invoking the script.
 
+  .. versionadded:: 3.18
+    Added support for ``DOWNLOAD_NO_EXTRACT`` and ``SOURCE_SUBDIR`` options.
 
 .. command:: FetchContent_GetProperties
 
@@ -415,6 +420,8 @@ is simpler and provides additional features over the pattern above.
   .. code-block:: cmake
 
     FetchContent_MakeAvailable( <name1> [<name2>...] )
+
+  .. versionadded:: 3.14
 
   This command implements the common pattern typically needed for most
   dependencies.  It iterates over each of the named dependencies in turn
@@ -1052,6 +1059,19 @@ function(FetchContent_Populate contentName)
     # The source directory has been explicitly provided in the cache,
     # so no population is required. The build directory may still be specified
     # by the declared details though.
+
+    if(NOT IS_ABSOLUTE "${FETCHCONTENT_SOURCE_DIR_${contentNameUpper}}")
+      # Don't check this directory because we don't know what location it is
+      # expected to be relative to. We can't make this a hard error for backward
+      # compatibility reasons.
+      message(WARNING "Relative source directory specified. This is not safe, "
+        "as it depends on the calling directory scope.\n"
+        "  FETCHCONTENT_SOURCE_DIR_${contentNameUpper} --> ${FETCHCONTENT_SOURCE_DIR_${contentNameUpper}}")
+    elseif(NOT EXISTS "${FETCHCONTENT_SOURCE_DIR_${contentNameUpper}}")
+      message(FATAL_ERROR "Manually specified source directory is missing:\n"
+        "  FETCHCONTENT_SOURCE_DIR_${contentNameUpper} --> ${FETCHCONTENT_SOURCE_DIR_${contentNameUpper}}")
+    endif()
+
     set(${contentNameLower}_SOURCE_DIR "${FETCHCONTENT_SOURCE_DIR_${contentNameUpper}}")
 
     cmake_parse_arguments(savedDetails "" "BINARY_DIR" "" ${contentDetails})

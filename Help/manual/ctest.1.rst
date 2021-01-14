@@ -324,6 +324,9 @@ Options
 ``--build-and-test``
 See `Build and Test Mode`_.
 
+``--test-dir <dir>``
+Specify the directory in which to look for tests.
+
 ``--test-output-size-passed <size>``
  Limit the output for passed tests to ``<size>`` bytes.
 
@@ -1141,6 +1144,20 @@ Additional configuration settings include:
 
   * `CTest Script`_ variable: none
   * :module:`CTest` module variable: ``DRMEMORY_COMMAND_OPTIONS``
+
+``CudaSanitizerCommand``
+  Specify a ``MemoryCheckCommand`` that is known to be a command-line
+  compatible with cuda-memcheck or compute-sanitizer.
+
+  * `CTest Script`_ variable: none
+  * :module:`CTest` module variable: ``CUDA_SANITIZER_COMMAND``
+
+``CudaSanitizerCommandOptions``
+  Specify command-line options to the ``CudaSanitizerCommand`` tool.
+  They will be placed prior to the test command line.
+
+  * `CTest Script`_ variable: none
+  * :module:`CTest` module variable: ``CUDA_SANITIZER_COMMAND_OPTIONS``
 
 .. _`CTest Submit Step`:
 

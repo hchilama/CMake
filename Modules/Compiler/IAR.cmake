@@ -42,13 +42,14 @@ include_guard()
 
 macro(__compiler_iar_ilink lang)
   set(CMAKE_EXECUTABLE_SUFFIX ".elf")
+  set(CMAKE_${lang}_OUTPUT_EXTENSION ".o")
   if (${lang} STREQUAL "C" OR ${lang} STREQUAL "CXX")
     set(CMAKE_${lang}_COMPILE_OBJECT             "<CMAKE_${lang}_COMPILER> ${CMAKE_IAR_${lang}_FLAG} --silent <SOURCE> <DEFINES> <INCLUDES> <FLAGS> -o <OBJECT>")
     set(CMAKE_${lang}_CREATE_PREPROCESSED_SOURCE "<CMAKE_${lang}_COMPILER> ${CMAKE_IAR_${lang}_FLAG} --silent <SOURCE> <DEFINES> <INCLUDES> <FLAGS> --preprocess=cnl <PREPROCESSED_SOURCE>")
     set(CMAKE_${lang}_CREATE_ASSEMBLY_SOURCE     "<CMAKE_${lang}_COMPILER> ${CMAKE_IAR_${lang}_FLAG} --silent <SOURCE> <DEFINES> <INCLUDES> <FLAGS> -lAH <ASSEMBLY_SOURCE> -o <OBJECT>.dummy")
 
     set(CMAKE_${lang}_RESPONSE_FILE_LINK_FLAG "-f ")
-    set(CMAKE_DEPFILE_FLAGS_${lang} "--dependencies=ns <DEPFILE>")
+    set(CMAKE_DEPFILE_FLAGS_${lang} "--dependencies=ns <DEP_FILE>")
 
     string(APPEND CMAKE_${lang}_FLAGS_INIT " ")
     string(APPEND CMAKE_${lang}_FLAGS_DEBUG_INIT " -r")
@@ -84,7 +85,7 @@ macro(__compiler_iar_xlink lang)
     set(CMAKE_${lang}_CREATE_ASSEMBLY_SOURCE     "<CMAKE_${lang}_COMPILER> ${CMAKE_IAR_${lang}_FLAG} --silent <SOURCE> <DEFINES> <INCLUDES> <FLAGS> -lAH <ASSEMBLY_SOURCE> -o <OBJECT>.dummy")
 
     set(CMAKE_${lang}_RESPONSE_FILE_LINK_FLAG "-f ")
-    set(CMAKE_DEPFILE_FLAGS_${lang} "--dependencies=ns <DEPFILE>")
+    set(CMAKE_DEPFILE_FLAGS_${lang} "--dependencies=ns <DEP_FILE>")
 
     string(APPEND CMAKE_${lang}_FLAGS_INIT " ")
     string(APPEND CMAKE_${lang}_FLAGS_DEBUG_INIT " -r")

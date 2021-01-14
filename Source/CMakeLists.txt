@@ -2,9 +2,12 @@
 # file Copyright.txt or https://cmake.org/licensing for details.
 
 # To ensure maximum portability across various compilers and platforms
-# deactivate any compiler extensions
-set(CMAKE_C_EXTENSIONS FALSE)
-set(CMAKE_CXX_EXTENSIONS FALSE)
+# deactivate any compiler extensions.  Skip this for QNX, where additional
+# work is needed to build without compiler extensions.
+if (NOT CMAKE_SYSTEM_NAME STREQUAL "QNX")
+  set(CMAKE_C_EXTENSIONS FALSE)
+  set(CMAKE_CXX_EXTENSIONS FALSE)
+endif()
 
 include(CheckIncludeFile)
 # Check if we can build support for ELF parsing.
@@ -178,10 +181,12 @@ set(SRCS
   cmBinUtilsWindowsPEObjdumpGetRuntimeDependenciesTool.h
   cmCacheManager.cxx
   cmCacheManager.h
-  cmCheckCustomOutputs.h
-  cmCheckCustomOutputs.cxx
   cmCLocaleEnvironmentScope.h
   cmCLocaleEnvironmentScope.cxx
+  cmCMakePath.h
+  cmCMakePath.cxx
+  cmCMakePresetsFile.cxx
+  cmCMakePresetsFile.h
   cmCommandArgumentParserHelper.cxx
   cmCommonTargetGenerator.cxx
   cmCommonTargetGenerator.h
@@ -193,6 +198,8 @@ set(SRCS
   cmComputeLinkInformation.h
   cmComputeTargetDepends.h
   cmComputeTargetDepends.cxx
+  cmConsoleBuf.h
+  cmConsoleBuf.cxx
   cmCPackPropertiesGenerator.h
   cmCPackPropertiesGenerator.cxx
   cmCryptoHash.cxx
@@ -218,6 +225,8 @@ set(SRCS
   cmDependsJava.h
   cmDependsJavaParserHelper.cxx
   cmDependsJavaParserHelper.h
+  cmDependsCompiler.cxx
+  cmDependsCompiler.h
   cmDocumentation.cxx
   cmDocumentationFormatter.cxx
   cmDocumentationSection.cxx
@@ -259,6 +268,8 @@ set(SRCS
   cmFileAPICodemodel.h
   cmFileAPICMakeFiles.cxx
   cmFileAPICMakeFiles.h
+  cmFileAPIToolchains.cxx
+  cmFileAPIToolchains.h
   cmFileCopier.cxx
   cmFileCopier.h
   cmFileInstaller.cxx
@@ -334,6 +345,7 @@ set(SRCS
   cmInstallTargetGenerator.cxx
   cmInstallDirectoryGenerator.h
   cmInstallDirectoryGenerator.cxx
+  cmJSONHelpers.h
   cmLDConfigLDConfigTool.cxx
   cmLDConfigLDConfigTool.h
   cmLDConfigTool.cxx
@@ -434,6 +446,8 @@ set(SRCS
   cmTest.h
   cmTestGenerator.cxx
   cmTestGenerator.h
+  cmTransformDepfile.cxx
+  cmTransformDepfile.h
   cmUuid.cxx
   cmUVHandlePtr.cxx
   cmUVHandlePtr.h
@@ -498,6 +512,8 @@ set(SRCS
   cmCMakeLanguageCommand.h
   cmCMakeMinimumRequired.cxx
   cmCMakeMinimumRequired.h
+  cmCMakePathCommand.h
+  cmCMakePathCommand.cxx
   cmCMakePolicyCommand.cxx
   cmCMakePolicyCommand.h
   cmConditionEvaluator.cxx
@@ -823,6 +839,7 @@ endif()
 
 # Ninja support
 set(SRCS ${SRCS}
+  cmScanDepFormat.cxx
   cmGlobalNinjaGenerator.cxx
   cmGlobalNinjaGenerator.h
   cmNinjaTypes.h
@@ -941,6 +958,7 @@ set(CTEST_SRCS cmCTest.cxx
   CTest/cmCTestResourceAllocator.cxx
   CTest/cmCTestResourceSpec.cxx
   CTest/cmCTestLaunch.cxx
+  CTest/cmCTestLaunchReporter.cxx
   CTest/cmCTestMemCheckCommand.cxx
   CTest/cmCTestMemCheckHandler.cxx
   CTest/cmCTestMultiProcessHandler.cxx
@@ -1145,20 +1163,6 @@ endif()
 add_executable(cmake cmakemain.cxx cmcmd.cxx cmcmd.h ${MANIFEST_FILE})
 list(APPEND _tools cmake)
 target_link_libraries(cmake CMakeLib)
-
-add_library(CMakeServerLib
-  cmConnection.h cmConnection.cxx
-  cmFileMonitor.cxx cmFileMonitor.h
-  cmJsonObjectDictionary.h
-  cmJsonObjects.h
-  cmJsonObjects.cxx
-  cmPipeConnection.cxx cmPipeConnection.h
-  cmServer.cxx cmServer.h
-  cmServerConnection.cxx cmServerConnection.h
-  cmServerProtocol.cxx cmServerProtocol.h
-  )
-target_link_libraries(CMakeServerLib CMakeLib)
-target_link_libraries(cmake CMakeServerLib)
 
 # Build CTest executable
 add_executable(ctest ctest.cxx ${MANIFEST_FILE})

@@ -4,11 +4,15 @@ import time
 import subprocess
 import sys
 import os
+import threading
 args = None
 outerthread = None
 
+barrier = threading.Barrier(2)
+
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
+        barrier.wait()
         self.send_response(200)
         self.end_headers()
         data = b'D'
@@ -25,6 +29,13 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(data)
         self.close_connection = True
 
+def runServer(fileName):
+    httpd = HTTPServer(('localhost', 0), SimpleHTTPRequestHandler)
+    with open(fileName,"w") as f:
+        f.write('http://localhost:{}/test'.format(httpd.socket.getsockname()[1]))
+    httpd.handle_request()
+    os.remove(fileName)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--speed_limit', help='transfer rate limitation', action='store_true',default=False)
@@ -35,8 +46,8 @@ if __name__ == "__main__":
     if not args.subprocess:
         subprocess.Popen([sys.executable]+sys.argv+['--subprocess'],stdin=subprocess.DEVNULL, stderr=subprocess.DEVNULL,stdout=subprocess.DEVNULL)
     else:
-        httpd = HTTPServer(('localhost', 0), SimpleHTTPRequestHandler)
-        with open(args.file,"w") as f:
-            f.write('http://localhost:{}/test'.format(httpd.socket.getsockname()[1]))
-        httpd.handle_request()
-        os.remove(args.file)
+        serverThread = threading.Thread(target=runServer,args=(args.file,))
+        serverThread.daemon = True
+        serverThread.start()
+        barrier.wait(60)
+        serverThread.join(20)

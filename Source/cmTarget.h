@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmTarget_h
-#define cmTarget_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -115,7 +114,7 @@ public:
   LinkLibraryVectorType const& GetOriginalLinkLibraries() const;
 
   //! Clear the dependency information recorded for this target, if any.
-  void ClearDependencyInformation(cmMakefile& mf);
+  void ClearDependencyInformation(cmMakefile& mf) const;
 
   void AddLinkLibrary(cmMakefile& mf, std::string const& lib,
                       cmTargetLinkLibraryType llt);
@@ -165,6 +164,7 @@ public:
    */
   void AddUtility(std::string const& name, bool cross,
                   cmMakefile* mf = nullptr);
+  void AddUtility(BT<std::pair<std::string, bool>> util);
   //! Get the utilities used by this target
   std::set<BT<std::pair<std::string, bool>>> const& GetUtilities() const;
 
@@ -172,7 +172,7 @@ public:
   void SetProperty(const std::string& prop, const char* value);
   void SetProperty(const std::string& prop, const std::string& value)
   {
-    SetProperty(prop, value.c_str());
+    this->SetProperty(prop, value.c_str());
   }
   void AppendProperty(const std::string& prop, const std::string& value,
                       bool asString = false);
@@ -291,5 +291,3 @@ private:
 private:
   std::unique_ptr<cmTargetInternals> impl;
 };
-
-#endif

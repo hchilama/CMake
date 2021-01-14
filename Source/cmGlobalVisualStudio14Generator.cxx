@@ -30,7 +30,7 @@ class cmGlobalVisualStudio14Generator::Factory
 {
 public:
   std::unique_ptr<cmGlobalGenerator> CreateGlobalGenerator(
-    const std::string& name, cmake* cm) const override
+    const std::string& name, bool allowArch, cmake* cm) const override
   {
     std::string genName;
     const char* p = cmVS14GenName(name, genName);
@@ -41,7 +41,7 @@ public:
       return std::unique_ptr<cmGlobalGenerator>(
         new cmGlobalVisualStudio14Generator(cm, genName, ""));
     }
-    if (*p++ != ' ') {
+    if (!allowArch || *p++ != ' ') {
       return std::unique_ptr<cmGlobalGenerator>();
     }
     if (strcmp(p, "Win64") == 0) {
@@ -239,8 +239,8 @@ std::string cmGlobalVisualStudio14Generator::GetWindows10SDKMaxVersion(
 {
   // if the given value is set, it can either be OFF/FALSE or a valid SDK
   // string
-  if (std::string const* value =
-        mf->GetDef("CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION_MAXIMUM")) {
+  if (cmProp value = mf->GetDefinition(
+        "CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION_MAXIMUM")) {
 
     // If the value is some off/false value, then there is NO maximum set.
     if (cmIsOff(value)) {

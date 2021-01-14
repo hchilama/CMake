@@ -1,6 +1,8 @@
 CPack External Generator
 ------------------------
 
+.. versionadded:: 3.13
+
 CPack provides many generators to create packages for a variety of platforms
 and packaging systems. The intention is for CMake/CPack to be a complete
 end-to-end solution for building and packaging a software project. However, it
@@ -284,7 +286,9 @@ Variables specific to CPack External generator
 
 .. variable:: CPACK_EXTERNAL_BUILT_PACKAGES
 
+  .. versionadded:: 3.19
+
   The ``CPACK_EXTERNAL_PACKAGE_SCRIPT`` script may set this list variable to the
-  full paths of generated package files.  CPack copy these files from the stage
-  directory back to the top build directory and possibly produce checksum files
-  if the :variable:`CPACK_PACKAGE_CHECKSUM` is set.
+  full paths of generated package files.  CPack will copy these files from the
+  staging directory back to the top build directory and possibly produce
+  checksum files if the :variable:`CPACK_PACKAGE_CHECKSUM` is set.

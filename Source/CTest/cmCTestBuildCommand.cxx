@@ -2,7 +2,6 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmCTestBuildCommand.h"
 
-#include <cstring>
 #include <sstream>
 
 #include <cmext/string_view>
@@ -39,12 +38,13 @@ cmCTestGenericHandler* cmCTestBuildCommand::InitializeHandler()
 
   this->Handler = handler;
 
-  cmProp ctestBuildCommand = this->Makefile->GetDef("CTEST_BUILD_COMMAND");
+  cmProp ctestBuildCommand =
+    this->Makefile->GetDefinition("CTEST_BUILD_COMMAND");
   if (cmNonempty(ctestBuildCommand)) {
     this->CTest->SetCTestConfiguration("MakeCommand", *ctestBuildCommand,
                                        this->Quiet);
   } else {
-    const char* cmakeGeneratorName =
+    cmProp cmakeGeneratorName =
       this->Makefile->GetDefinition("CTEST_CMAKE_GENERATOR");
 
     // Build configuration is determined by: CONFIGURATION argument,
@@ -52,58 +52,53 @@ cmCTestGenericHandler* cmCTestBuildCommand::InitializeHandler()
     // CTEST_CONFIGURATION_TYPE script variable, or ctest -C command
     // line argument... in that order.
     //
-    const char* ctestBuildConfiguration =
+    cmProp ctestBuildConfiguration =
       this->Makefile->GetDefinition("CTEST_BUILD_CONFIGURATION");
-    const char* cmakeBuildConfiguration = !this->Configuration.empty()
-      ? this->Configuration.c_str()
-      : (cmNonempty(ctestBuildConfiguration)
-           ? ctestBuildConfiguration
-           : this->CTest->GetConfigType().c_str());
+    std::string cmakeBuildConfiguration = cmNonempty(this->Configuration)
+      ? this->Configuration
+      : cmNonempty(ctestBuildConfiguration) ? *ctestBuildConfiguration
+                                            : this->CTest->GetConfigType();
 
-    const char* cmakeBuildAdditionalFlags = !this->Flags.empty()
-      ? this->Flags.c_str()
-      : this->Makefile->GetDefinition("CTEST_BUILD_FLAGS");
-    const char* cmakeBuildTarget = !this->Target.empty()
-      ? this->Target.c_str()
-      : this->Makefile->GetDefinition("CTEST_BUILD_TARGET");
+    const std::string& cmakeBuildAdditionalFlags = cmNonempty(this->Flags)
+      ? this->Flags
+      : this->Makefile->GetSafeDefinition("CTEST_BUILD_FLAGS");
+    const std::string& cmakeBuildTarget = cmNonempty(this->Target)
+      ? this->Target
+      : this->Makefile->GetSafeDefinition("CTEST_BUILD_TARGET");
 
     if (cmNonempty(cmakeGeneratorName)) {
-      if (!cmakeBuildConfiguration) {
+      if (cmakeBuildConfiguration.empty()) {
         cmakeBuildConfiguration = "Release";
       }
       if (this->GlobalGenerator) {
-        if (this->GlobalGenerator->GetName() != cmakeGeneratorName) {
+        if (this->GlobalGenerator->GetName() != *cmakeGeneratorName) {
           this->GlobalGenerator.reset();
         }
       }
       if (!this->GlobalGenerator) {
         this->GlobalGenerator =
           this->Makefile->GetCMakeInstance()->CreateGlobalGenerator(
-            cmakeGeneratorName);
+            *cmakeGeneratorName);
         if (!this->GlobalGenerator) {
           std::string e = cmStrCat("could not create generator named \"",
-                                   cmakeGeneratorName, '"');
+                                   *cmakeGeneratorName, '"');
           this->Makefile->IssueMessage(MessageType::FATAL_ERROR, e);
           cmSystemTools::SetFatalErrorOccured();
           return nullptr;
         }
       }
-      if (strlen(cmakeBuildConfiguration) == 0) {
-        const char* config = nullptr;
+      if (cmakeBuildConfiguration.empty()) {
 #ifdef CMAKE_INTDIR
-        config = CMAKE_INTDIR;
+        cmakeBuildConfiguration = CMAKE_INTDIR;
+#else
+        cmakeBuildConfiguration = "Debug";
 #endif
-        if (!config) {
-          config = "Debug";
-        }
-        cmakeBuildConfiguration = config;
       }
 
       std::string dir = this->CTest->GetCTestConfiguration("BuildDirectory");
       std::string buildCommand =
         this->GlobalGenerator->GenerateCMakeBuildCommand(
-          cmakeBuildTarget ? cmakeBuildTarget : "", cmakeBuildConfiguration,
-          cmakeBuildAdditionalFlags ? cmakeBuildAdditionalFlags : "",
+          cmakeBuildTarget, cmakeBuildConfiguration, cmakeBuildAdditionalFlags,
           this->Makefile->IgnoreErrorsCMP0061());
       cmCTestOptionalLog(this->CTest, HANDLER_VERBOSE_OUTPUT,
                          "SetMakeCommand:" << buildCommand << "\n",
@@ -123,13 +118,14 @@ cmCTestGenericHandler* cmCTestBuildCommand::InitializeHandler()
     }
   }
 
-  if (cmProp useLaunchers = this->Makefile->GetDef("CTEST_USE_LAUNCHERS")) {
+  if (cmProp useLaunchers =
+        this->Makefile->GetDefinition("CTEST_USE_LAUNCHERS")) {
     this->CTest->SetCTestConfiguration("UseLaunchers", *useLaunchers,
                                        this->Quiet);
   }
 
   if (cmProp labelsForSubprojects =
-        this->Makefile->GetDef("CTEST_LABELS_FOR_SUBPROJECTS")) {
+        this->Makefile->GetDefinition("CTEST_LABELS_FOR_SUBPROJECTS")) {
     this->CTest->SetCTestConfiguration("LabelsForSubprojects",
                                        *labelsForSubprojects, this->Quiet);
   }
@@ -141,7 +137,7 @@ cmCTestGenericHandler* cmCTestBuildCommand::InitializeHandler()
 bool cmCTestBuildCommand::InitialPass(std::vector<std::string> const& args,
                                       cmExecutionStatus& status)
 {
-  bool ret = cmCTestHandlerCommand::InitialPass(args, status);
+  bool ret = this->cmCTestHandlerCommand::InitialPass(args, status);
   if (!this->NumberErrors.empty()) {
     this->Makefile->AddDefinition(
       this->NumberErrors, std::to_string(this->Handler->GetTotalErrors()));

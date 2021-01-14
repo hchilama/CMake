@@ -7,8 +7,10 @@
 #include "cmsys/FStream.hxx"
 
 #include "cmFileTime.h"
+#include "cmGlobalUnixMakefileGenerator3.h"
 #include "cmLocalUnixMakefileGenerator3.h"
 #include "cmMakefile.h"
+#include "cmProperty.h"
 #include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 
@@ -38,13 +40,13 @@ cmDependsC::cmDependsC(cmLocalUnixMakefileGenerator3* lg,
   std::string complainRegex = "^$";
   {
     std::string scanRegexVar = cmStrCat("CMAKE_", lang, "_INCLUDE_REGEX_SCAN");
-    if (const char* sr = mf->GetDefinition(scanRegexVar)) {
-      scanRegex = sr;
+    if (cmProp sr = mf->GetDefinition(scanRegexVar)) {
+      scanRegex = *sr;
     }
     std::string complainRegexVar =
       cmStrCat("CMAKE_", lang, "_INCLUDE_REGEX_COMPLAIN");
-    if (const char* cr = mf->GetDefinition(complainRegexVar)) {
-      complainRegex = cr;
+    if (cmProp cr = mf->GetDefinition(complainRegexVar)) {
+      complainRegex = *cr;
     }
   }
 
@@ -214,16 +216,28 @@ bool cmDependsC::WriteDependencies(const std::set<std::string>& sources,
   // directory.  We must do the same here.
   std::string obj_m = this->LocalGenerator->ConvertToMakefilePath(obj_i);
   internalDepends << obj_i << '\n';
-
-  for (std::string const& dep : dependencies) {
-    makeDepends << obj_m << ": "
-                << this->LocalGenerator->ConvertToMakefilePath(
-                     this->LocalGenerator->MaybeConvertToRelativePath(binDir,
-                                                                      dep))
-                << '\n';
-    internalDepends << ' ' << dep << '\n';
+  if (!dependencies.empty()) {
+    const auto& lineContinue = static_cast<cmGlobalUnixMakefileGenerator3*>(
+                                 this->LocalGenerator->GetGlobalGenerator())
+                                 ->LineContinueDirective;
+    bool supportLongLineDepend = static_cast<cmGlobalUnixMakefileGenerator3*>(
+                                   this->LocalGenerator->GetGlobalGenerator())
+                                   ->SupportsLongLineDependencies();
+    if (supportLongLineDepend) {
+      makeDepends << obj_m << ':';
+    }
+    for (std::string const& dep : dependencies) {
+      std::string dependee = this->LocalGenerator->ConvertToMakefilePath(
+        this->LocalGenerator->MaybeConvertToRelativePath(binDir, dep));
+      if (supportLongLineDepend) {
+        makeDepends << ' ' << lineContinue << ' ' << dependee;
+      } else {
+        makeDepends << obj_m << ": " << dependee << '\n';
+      }
+      internalDepends << ' ' << dep << '\n';
+    }
+    makeDepends << '\n';
   }
-  makeDepends << '\n';
 
   return true;
 }
